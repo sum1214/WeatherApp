@@ -45,7 +45,7 @@ public class WeatherAdapter extends RecyclerView.Adapter<WeatherAdapter.ViewHold
         }catch (Exception e) {
             e.printStackTrace();
         }
-        Picasso.get().load("http:".concat(weatherModel.getIcon())).into(holder.condition_iv);
+        Picasso.get().load("https:".concat(weatherModel.getIcon())).into(holder.condition_iv);
         holder.temp_tv.setText(weatherModel.getTemperature().concat("℃"));
         holder.wind_tv.setText(weatherModel.getWindSpeed().concat("Km/h"));
     }

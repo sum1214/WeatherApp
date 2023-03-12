@@ -7,7 +7,9 @@ import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.location.Address;
 import android.location.Geocoder;
@@ -27,6 +29,9 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.example.myweatherforecastapp.databinding.ActivityMainBinding;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.squareup.picasso.Picasso;
 
 import org.json.JSONArray;
@@ -41,39 +46,31 @@ public class MainActivity extends AppCompatActivity {
     ActivityMainBinding binding;
     ArrayList<WeatherModel> weatherData;
     WeatherAdapter weatherAdapter;
+    FusedLocationProviderClient fusedLocationProviderClient;
     String TAG = "MainActivity";
-    LocationManager locationManager;
     int PERMISSION_CODE = 1;
     String cityName;
+
     @RequiresApi(api = Build.VERSION_CODES.TIRAMISU)
     @SuppressLint("ServiceCast")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         binding = ActivityMainBinding.inflate(getLayoutInflater());
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
         setContentView(binding.getRoot());
         getSupportActionBar().hide();
         weatherData = new ArrayList<>();
-        weatherAdapter = new WeatherAdapter(this,weatherData);
+        weatherAdapter = new WeatherAdapter(this, weatherData);
         binding.weatherRv.setAdapter(weatherAdapter);
-        locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-        if ((ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) && (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)) {
-            ActivityCompat.requestPermissions(MainActivity.this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_CODE);
-        }
-        Location location = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-        if (location==null) {
-            cityName = "Bihar Sharif";
-        } else {
-            cityName = getCityName(location.getLongitude(),location.getLatitude());
-        }
-        getWeatherInfo(cityName);
+        fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this);
+        getLastLocation();
         binding.searchIv.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 CharSequence city = binding.editTextTiet.getText();
-                if (city==null || city.toString().isEmpty()) {
-                    Toast.makeText(MainActivity.this,"Please Enter City Name",Toast.LENGTH_LONG).show();
+                if (city == null || city.toString().isEmpty()) {
+                    Toast.makeText(MainActivity.this, "Please Enter City Name", Toast.LENGTH_LONG).show();
                 } else {
                     binding.cityNameTxt.setText(city);
                     getWeatherInfo(city.toString());
@@ -86,11 +83,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode==PERMISSION_CODE) {
-            if (grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED) {
-               Toast.makeText(MainActivity.this,"Permission Granted",Toast.LENGTH_LONG).show();
+        if (requestCode == PERMISSION_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(MainActivity.this, "Permission Granted", Toast.LENGTH_LONG).show();
+                getLastLocation();
             } else {
-                Toast.makeText(MainActivity.this,"Please Provide the Permission",Toast.LENGTH_LONG).show();
+                Toast.makeText(MainActivity.this, "Please Provide the Permission", Toast.LENGTH_LONG).show();
                 finish();
             }
         }
@@ -100,40 +98,41 @@ public class MainActivity extends AppCompatActivity {
         String cityName = null;
         Geocoder geocoder = new Geocoder(getBaseContext(), Locale.getDefault());
         try {
-            List<Address> addressList = geocoder.getFromLocation(latitude,longitude,10);
-            for (Address address:addressList) {
-                if (address!=null) {
+            List<Address> addressList = geocoder.getFromLocation(latitude, longitude, 10);
+            for (Address address : addressList) {
+                if (address != null) {
                     String city = address.getLocality();
-                    if (city!=null && !city.isEmpty()) {
+                    if (city != null && !city.isEmpty()) {
                         cityName = city;
                     }
                 }
             }
-        }catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return cityName;
     }
+
     private void getWeatherInfo(String cityName) {
-      String url = "https://api.weatherapi.com/v1/forecast.json?key=15c800b0d26446498ab91433231103&q="+cityName+"&days=1&aqi=yes&alerts=yes";
-      binding.cityNameTxt.setText(cityName);
+        String url = "https://api.weatherapi.com/v1/forecast.json?key=15c800b0d26446498ab91433231103&q=" + cityName + "&days=1&aqi=yes&alerts=yes";
+        binding.cityNameTxt.setText(cityName);
         RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
             @SuppressLint("NotifyDataSetChanged")
             @Override
             public void onResponse(JSONObject response) {
-               binding.loadingProgressBar.setVisibility(View.GONE);
-               binding.homeLayout.setVisibility(View.VISIBLE);
-               weatherData.clear();
+                binding.loadingProgressBar.setVisibility(View.GONE);
+                binding.homeLayout.setVisibility(View.VISIBLE);
+                weatherData.clear();
                 try {
                     String temp = response.getJSONObject("current").getString("temp_c");
-                    binding.temperatureTxt.setText(temp+"℃");
+                    binding.temperatureTxt.setText(temp + "℃");
                     int isDay = response.getJSONObject("current").getInt("is_day");
                     String condition = response.getJSONObject("current").getJSONObject("condition").getString("text");
                     String conditionIcon = response.getJSONObject("current").getJSONObject("condition").getString("icon");
-                    Picasso.get().load("http:".concat(conditionIcon)).into(binding.tempIv);
+                    Picasso.get().load("https:".concat(conditionIcon)).into(binding.tempIv);
                     binding.conditionTxt.setText(condition);
-                    if (isDay==1) {
+                    if (isDay == 1) {
                         Picasso.get().load("https://images.unsplash.com/photo-1600262912274-28f333fa17bd?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxzZWFyY2h8NXx8bW9ybmluZyUyMHNreXxlbnwwfHwwfHw%3D&auto=format&fit=crop&w=500&q=60").into(binding.bgImg);
                     } else {
                         Picasso.get().load("https://media.istockphoto.com/id/809971888/photo/night-sky-landscape.jpg?b=1&s=170667a&w=0&k=20&c=-1smAP9--twhHyqopksRe3lIORQvO9JaaNWbT1Ra-Is=").into(binding.bgImg);
@@ -141,13 +140,13 @@ public class MainActivity extends AppCompatActivity {
                     JSONObject forecastJsonObject = response.getJSONObject("forecast");
                     JSONObject foreCast0 = forecastJsonObject.getJSONArray("forecastday").getJSONObject(0);
                     JSONArray hourArray = foreCast0.getJSONArray("hour");
-                    for (int i=0;i<hourArray.length();i++) {
-                      JSONObject hourObj = hourArray.getJSONObject(i);
-                      String time = hourObj.getString("time");
-                      String temperature = hourObj.getString("temp_c");
-                      String img = hourObj.getJSONObject("condition").getString("icon");
-                      String wind = hourObj.getString("wind_kph");
-                      weatherData.add(new WeatherModel(time,temperature,img,wind));
+                    for (int i = 0; i < hourArray.length(); i++) {
+                        JSONObject hourObj = hourArray.getJSONObject(i);
+                        String time = hourObj.getString("time");
+                        String temperature = hourObj.getString("temp_c");
+                        String img = hourObj.getJSONObject("condition").getString("icon");
+                        String wind = hourObj.getString("wind_kph");
+                        weatherData.add(new WeatherModel(time, temperature, img, wind));
                     }
                     weatherAdapter.notifyDataSetChanged();
                 } catch (JSONException e) {
@@ -157,9 +156,26 @@ public class MainActivity extends AppCompatActivity {
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-               Toast.makeText(MainActivity.this,"Please Enter Valid City Name",Toast.LENGTH_LONG).show();
+                Toast.makeText(MainActivity.this, "Please Enter Valid City Name", Toast.LENGTH_LONG).show();
             }
         });
         requestQueue.add(jsonObjectRequest);
+    }
+    private void getLastLocation() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(MainActivity.this, new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_CODE);
+            return;
+        }
+        fusedLocationProviderClient.getLastLocation().addOnSuccessListener(new OnSuccessListener<Location>() {
+            @Override
+            public void onSuccess(Location location) {
+                if (location == null) {
+                    cityName = "Bihar Sharif";
+                } else {
+                    cityName = getCityName(location.getLongitude(), location.getLatitude());
+                }
+                getWeatherInfo(cityName);
+            }
+        });
     }
 }

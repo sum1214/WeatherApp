@@ -88,8 +88,8 @@
             android:textColor="@color/white"
             android:textSize="70dp"/>
         <ImageView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
             android:id="@+id/temp_iv"
             android:layout_below="@id/temperature_txt"
             android:src="@mipmap/ic_launcher"
