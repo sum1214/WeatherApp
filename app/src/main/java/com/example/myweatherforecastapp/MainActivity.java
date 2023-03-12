@@ -170,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSuccess(Location location) {
                 if (location == null) {
-                    cityName = "Bihar Sharif";
+                    cityName = "Landon";
                 } else {
                     cityName = getCityName(location.getLongitude(), location.getLatitude());
                 }
